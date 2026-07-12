@@ -72,12 +72,13 @@ if is_groq:
 # --- Main ---
 
 def main():
-    question = "I just discovered the course. Can I join now?"
+    # Use a question with a typo to showcase agentic recovery via function calling
+    question = "How do I run Olama?"
 
-    print(f"Sending request to LLM (Model: {MODEL})...")
+    print(f"Sending request to agentic LLM (Model: {MODEL})...")
     try:
-        # Run the RAG pipeline end-to-end
-        answer = assistant.rag(question)
+        # Run the agentic RAG pipeline (function calling loop)
+        answer = assistant.rag_agent(question)
         print("\n--- LLM Response ---")
         print(answer)
     except Exception as e:
