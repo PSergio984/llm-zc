@@ -1,114 +1,78 @@
 import os
-import requests
-import minsearch
 from dotenv import load_dotenv
 from openai import OpenAI
 
-# Load environment variables
+# Import modular helper functions from ingest and helper
+from ingest import load_faq_data, build_index
+from rag_helper import RAGBase
+
+# Load configurations from .env
 load_dotenv()
 
-# --- LLM Client Setup ---
+# --- Client Setup ---
 
 api_key = os.getenv("OPENAI_API_KEY")
 is_groq = api_key and api_key.startswith("gsk_")
 
 if is_groq:
+    # Setup OpenAI client routed to Groq's gateway
     openai_client = OpenAI(
         api_key=api_key,
         base_url="https://api.groq.com/openai/v1"
     )
-    DEFAULT_MODEL = "llama-3.1-8b-instant"
+    MODEL = "llama-3.1-8b-instant"
 else:
+    # Standard OpenAI client setup
     openai_client = OpenAI(api_key=api_key)
-    DEFAULT_MODEL = "gpt-4o-mini"
+    MODEL = "gpt-5.4-mini"
 
-# --- Data Ingestion ---
-
-def fetch_documents():
-    docs_url = "https://datatalks.club/faq/json/courses.json"
-    courses_raw = requests.get(docs_url).json()
-
-    documents = []
-    url_prefix = "https://datatalks.club/faq"
-
-    for course in courses_raw:
-        course_url = f"{url_prefix}{course['path']}"
-        course_response = requests.get(course_url)
-        course_response.raise_for_status()
-        documents.extend(course_response.json())
-
-    return documents
-
-# --- Search Index ---
-
-def build_index(documents):
-    index = minsearch.Index(
-        text_fields=["question", "text", "section"],
-        keyword_fields=["course"]
-    )
-    index.fit(documents)
-    return index
-
-def search(question, course="llm-zoomcamp"):
-    boost_dict = {"question": 2.0, "section": 0.5}
-    filter_dict = {"course": course}
-
-    return index.search(
-        question,
-        boost_dict=boost_dict,
-        filter_dict=filter_dict,
-        num_results=5
-    )
-
-# --- LLM ---
-
-def build_prompt(question, search_results):
-    context = "\n\n".join(
-        f"Section: {doc.get('section', 'N/A')}\n"
-        f"Question: {doc.get('question')}\n"
-        f"Answer: {doc.get('text', doc.get('answer', ''))}"
-        for doc in search_results
-    )
-    return f"""
-Your task is to answer questions from the course participants
-based on the provided context.
-
-Use the context to find relevant information and provide accurate
-answers. If the answer is not found in the context,
-respond with "I don't know."
-
-Question:
-{question}
-
-Context:
-{context}
-""".strip()
-
-def llm(prompt):
-    response = openai_client.chat.completions.create(
-        model=DEFAULT_MODEL,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.choices[0].message.content
-
-# --- Main ---
+# --- Setup ---
 
 print("Fetching documents...")
-documents = fetch_documents()
+# Download documents from FAQ URLs
+documents = load_faq_data()
 print(f"Loaded {len(documents)} documents.")
 
 print("Building search index...")
+# Build minsearch lookup index
 index = build_index(documents)
+
+# Create an assistant using the modular class
+assistant = RAGBase(
+    index=index,
+    llm_client=openai_client,
+    model=MODEL,
+    course="llm-zoomcamp"
+)
+
+# --- Groq compatibility patch ---
+# Groq doesn't support the responses.create() endpoint or "developer" role.
+# We patch the llm method to use chat.completions instead.
+if is_groq:
+    def _llm_groq(self, prompt):
+        messages = [
+            {"role": "system", "content": self.instructions},
+            {"role": "user", "content": prompt}
+        ]
+        response = self.llm_client.chat.completions.create(
+            model=self.model,
+            messages=messages
+        )
+        return response.choices[0].message.content
+
+    import types
+    # Dynamically bind the patched method to the assistant instance
+    assistant.llm = types.MethodType(_llm_groq, assistant)
+
+# --- Main ---
 
 def main():
     question = "I just discovered the course. Can I join now?"
 
-    results = search(question)
-    prompt = build_prompt(question, results)
-
-    print(f"Sending request to LLM (Model: {DEFAULT_MODEL})...")
+    print(f"Sending request to LLM (Model: {MODEL})...")
     try:
-        answer = llm(prompt)
+        # Run the RAG pipeline end-to-end
+        answer = assistant.rag(question)
         print("\n--- LLM Response ---")
         print(answer)
     except Exception as e:
@@ -116,3 +80,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
