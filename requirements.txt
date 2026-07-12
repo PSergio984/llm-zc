@@ -3,3 +3,4 @@ minsearch>=0.2.0
 openai>=2.45.0
 python-dotenv>=1.2.2
 requests>=2.34.2
+sqlitesearch>=0.3.0

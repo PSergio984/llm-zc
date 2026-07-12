@@ -1,5 +1,6 @@
 import requests
 from minsearch import Index
+from sqlitesearch import TextSearchIndex
 
 
 def load_faq_data():
@@ -40,3 +41,24 @@ def build_index(documents):
     index.fit(documents)
     return index
 
+
+def build_sqlite_index(documents, db_path="faq.db"):
+    # Create a persistent SQLite FTS5 index
+    index = TextSearchIndex(
+        text_fields=["question", "section", "answer"],
+        keyword_fields=["course"],
+        db_path=db_path
+    )
+    for doc in documents:
+        index.add(doc)
+    index.close()
+    return db_path
+
+
+def open_sqlite_index(db_path="faq.db"):
+    # Open an existing SQLite index for querying (no re-ingestion needed)
+    return TextSearchIndex(
+        text_fields=["question", "section", "answer"],
+        keyword_fields=["course"],
+        db_path=db_path
+    )

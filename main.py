@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 # Import modular helper functions from ingest and helper
-from ingest import load_faq_data, build_index
+from ingest import load_faq_data, build_index, open_sqlite_index
 from rag_helper import RAGBase
 
 # Load configurations from .env
@@ -28,14 +28,19 @@ else:
 
 # --- Setup ---
 
-print("Fetching documents...")
-# Download documents from FAQ URLs
-documents = load_faq_data()
-print(f"Loaded {len(documents)} documents.")
+DB_PATH = "faq.db"
 
-print("Building search index...")
-# Build minsearch lookup index
-index = build_index(documents)
+if os.path.exists(DB_PATH):
+    # Persistent index exists — open it directly, no fetching or re-indexing
+    print(f"Opening persistent index from {DB_PATH}...")
+    index = open_sqlite_index(DB_PATH)
+else:
+    # No persistent index — fall back to in-memory minsearch
+    print("faq.db not found. Falling back to minsearch (fetching data)...")
+    print("Run ingest_sqlite.py first to build a persistent index.")
+    documents = load_faq_data()
+    print(f"Loaded {len(documents)} documents.")
+    index = build_index(documents)
 
 # Create an assistant using the modular class
 assistant = RAGBase(
