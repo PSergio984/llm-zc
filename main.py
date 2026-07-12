@@ -51,8 +51,9 @@ assistant = RAGBase(
 )
 
 # --- Groq compatibility patch ---
-# Groq doesn't support the responses.create() endpoint or "developer" role.
-# We patch the llm method to use chat.completions instead.
+# Groq doesn't support responses.create() or the "developer" role.
+# Patch llm() (used by rag()) to use chat.completions instead.
+# Note: rag_agent() requires the Responses API and won't work with Groq.
 if is_groq:
     def _llm_groq(self, prompt):
         messages = [
