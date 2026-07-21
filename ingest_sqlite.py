@@ -1,8 +1,9 @@
 """
-Standalone data ingestion script.
+ingest_sqlite.py — Standalone data ingestion script.
 
 Run this once to populate faq.db with the LLM Zoomcamp FAQ documents.
-The query process (main.py) then opens the same file without re-fetching or re-indexing.
+The query process (main.py) then opens the same file without re-fetching
+or re-indexing.
 
 Usage:
     python ingest_sqlite.py

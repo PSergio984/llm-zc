@@ -1,3 +1,11 @@
+"""
+main.py — Entry point for the LLM Zoomcamp RAG assistant.
+
+Detects the API provider (OpenAI vs Groq), opens or builds the search
+index, creates a RAG assistant, then runs a query through the agentic
+pipeline.
+"""
+
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -87,4 +95,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

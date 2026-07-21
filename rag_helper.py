@@ -1,3 +1,12 @@
+"""
+rag_helper.py — Retrieval-Augmented Generation pipeline components.
+
+Contains the system prompt, the prompt template, and the RAGBase class
+that orchestrates search → context-building → LLM call.  Also includes
+an agentic loop (rag_agent) that uses OpenAI's Responses API to let the
+LLM decide when and what to search.
+"""
+
 # Instructions defining how the LLM should behave as an agent
 INSTRUCTIONS = """
 You're a course teaching assistant.
@@ -28,6 +37,14 @@ CONTEXT:
 
 
 class RAGBase:
+    """
+    Core RAG pipeline: retrieve relevant FAQ entries, build a prompt,
+    and ask an LLM for a grounded answer.
+
+    Supports two modes:
+      - rag()       → simple retrieve-then-generate (one-shot)
+      - rag_agent() → agentic loop with function-calling search
+    """
 
     def __init__(
         self,
@@ -38,7 +55,10 @@ class RAGBase:
         course="llm-zoomcamp",
         model="gpt-5.4-mini"
     ):
-        # Store index instance and client for querying and LLM calls
+        """
+        Store the search index, the LLM client, and the behavioural
+        configuration (instructions, prompt template, course filter).
+        """
         self.index = index
         self.llm_client = llm_client
         self.instructions = instructions
@@ -47,6 +67,10 @@ class RAGBase:
         self.model = model
 
     def search(self, query, num_results=5):
+        """
+        Query the index, boosting question-field matches and filtering
+        to the configured course.
+        """
         # Define boosts for indexing fields (boost question matching over sections)
         boost_dict = {"question": 3.0, "section": 0.5}
         # Filter documents based on specific course ID
@@ -61,6 +85,10 @@ class RAGBase:
         )
 
     def build_context(self, search_results):
+        """
+        Format a list of result dicts into a readable Q&A text block
+        that the LLM can consume as context.
+        """
         lines = []
 
         # Iterate over results to build formatted reference text block
@@ -73,12 +101,20 @@ class RAGBase:
         return "\n".join(lines).strip()
 
     def build_prompt(self, question, search_results):
+        """
+        Combine the user's question with the retrieved context inside
+        the prompt template.
+        """
         # Format retrieval context block
         context = self.build_context(search_results)
         # Apply structured formatting template
         return self.prompt_template.format(question=question, context=context)
 
     def llm(self, prompt):
+        """
+        Send a single prompt (instructions + user message) to the LLM
+        and return the text response.
+        """
         # Construct message payload with role-based segregation
         input_messages = [
             {"role": "developer", "content": self.instructions},
@@ -95,30 +131,34 @@ class RAGBase:
 
     def rag(self, query):
         """
-        Executes the full Retrieval-Augmented Generation (RAG) pipeline:
-        1. Search: Queries the search index to find relevant documents.
-        2. Context Building: Formats the raw search results into a Q&A context block.
-        3. Prompt Construction: Embeds the query and context into the prompt template.
-        4. LLM Generation: Sends the prompt and system instructions to the LLM.
+        Simple one-shot RAG pipeline:
+          1. Search the FAQ index for relevant documents.
+          2. Build a context block from the results.
+          3. Inject the question + context into the prompt template.
+          4. Send the full prompt to the LLM.
         """
         # Step 1: Retrieve context documents from the index
         search_results = self.search(query)
-        
+
         # Step 2 & 3: Format the context and build the final user prompt
         prompt = self.build_prompt(query, search_results)
-        
+
         # Step 4: Call the LLM to get the final answer
         answer = self.llm(prompt)
-        
+
         return answer
 
     def rag_agent(self, query):
         """
         Agentic RAG loop using the OpenAI Responses API.
-        Keeps calling the LLM and running tool calls until it returns a plain message.
+
+        The LLM receives a search tool it can call multiple times.
+        The loop continues until the LLM produces a plain-text message
+        (no more function calls).
         """
         import json
 
+        # Tool definition the LLM can invoke
         search_tool = {
             "type": "function",
             "name": "search",
@@ -175,6 +215,3 @@ class RAGBase:
                 break
 
         return last_answer
-
-
-
