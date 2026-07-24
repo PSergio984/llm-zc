@@ -4,7 +4,8 @@ embed_dataset.py — Embed the full FAQ dataset into a vector matrix.
 Loads every document from the course FAQ, builds a combined text
 per document (question + answer), then encodes them in batches
 using sentence-transformers. The result is a numpy matrix of shape
-(n_documents, 384) ready for vector search.
+(n_documents, 384) saved to disk as X.npy alongside documents.pkl
+for use by vector_search.py.
 
 Usage:
     python embed_dataset.py
@@ -76,6 +77,16 @@ def main():
     print(f"\nEmbedding matrix shape: {X.shape}")
     print(f"  => {X.shape[0]} documents")
     print(f"  => {X.shape[1]} dimensions per vector")
+
+    # Step 5: Persist the matrix and documents so vector_search.py can load them
+    # and perform similarity search without re-encoding every time.
+    print("\nSaving embedding matrix to X.npy ...")
+    np.save("X.npy", X)
+    print("Saving documents to documents.pkl ...")
+    import pickle
+    with open("documents.pkl", "wb") as f:
+        pickle.dump(documents, f)
+    print("Done. You can now run vector_search.py to query against the embeddings.")
 
     # Sanity check: first vector preview
     print(f"\nFirst vector (first 5 values): {X[0][:5]}")
