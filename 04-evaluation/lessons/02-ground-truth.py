@@ -86,7 +86,7 @@ cost = calc_price(usage)
 
 print(f"\nInput tokens:  {usage.input_tokens}")
 print(f"Output tokens: {usage.output_tokens}")
-print(f"Cost:          ${cost:.6f}")
+print(f"Cost:          ${cost['total_cost']:.6f}")
 
 # ── 5. Build ground truth records ───────────────────────────────────────
 # Each record pairs a generated question with the document ID.
