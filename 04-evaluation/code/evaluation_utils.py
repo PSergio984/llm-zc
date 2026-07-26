@@ -19,6 +19,9 @@ from rag_helper import RAGBase
 
 
 # ── Pricing helpers ──────────────────────────────────────────────────────
+# OpenAI charges per token, split into input (prompt) and output (completion).
+# The rates below are for gpt-5.4-mini / gpt-4o-mini used in this course.
+# We return a dict so callers can inspect the breakdown if needed.
 
 
 def calc_price(usage):
@@ -34,6 +37,7 @@ def calc_price(usage):
     input_price_per_million = 0.75
     output_price_per_million = 4.50
 
+    # Convert per-token rates to actual cost based on usage
     input_cost = (usage.input_tokens / 1_000_000) * input_price_per_million
     output_cost = (usage.output_tokens / 1_000_000) * output_price_per_million
     total_cost = input_cost + output_cost
@@ -65,11 +69,17 @@ def calc_total_price(usages):
 
 
 # ── Structured-output helpers ────────────────────────────────────────────
+# The OpenAI Responses API supports structured output via the `text_format`
+# parameter.  Instead of getting free text back, we pass a Pydantic model
+# and receive a fully parsed instance — no JSON parsing required.
 
 
 def llm_structured(client, instructions, user_prompt, output_type, model="gpt-5.4-mini"):
     """
     Call the OpenAI Responses API with structured output.
+
+    Uses client.responses.parse() with text_format=output_type so the
+    return value is a parsed Pydantic model instead of raw text.
 
     Args:
         client: OpenAI client instance.
@@ -107,8 +117,13 @@ def llm_structured_retry(
     """
     Call llm_structured with exponential-backoff retry logic.
 
-    Retries on any exception up to `max_retries` times, sleeping
-    2^attempt seconds between retries.
+    Useful in batch processing: a single flaky network call shouldn't
+    fail the entire ground-truth generation run.  Retries with 2^attempt
+    seconds of sleep between attempts (1s, 2s, 4s).
+
+    Args:
+        Same as llm_structured, plus:
+        max_retries: Number of attempts before giving up (default 3).
     """
     for attempt in range(max_retries):
         try:
@@ -132,8 +147,11 @@ class RAGWithUsage(RAGBase):
     """
     RAGBase subclass that tracks token usage for every LLM call.
 
-    Accumulates usage objects in self.usages and provides total_cost()
-    to calculate the combined price.
+    Overrides search() with different boost weights and llm() to capture
+    usage from each response.  Accumulates usage objects in self.usages
+    and provides total_cost() to calculate the combined price.
+
+    Use this when you need cost-awareness during evaluation runs.
     """
 
     def __init__(self, *args, **kwargs):
@@ -142,11 +160,12 @@ class RAGWithUsage(RAGBase):
         self.last_usage = None
 
     def reset_usage(self):
-        """Clear accumulated usage tracking."""
+        """Clear accumulated usage tracking (e.g. between eval runs)."""
         self.usages = []
         self.last_usage = None
 
     def search(self, query, num_results=5):
+        # Boost answer matching over question/section for evaluation queries
         boost_dict = {"question": 1.0, "answer": 2.0, "section": 0.1}
         filter_dict = {"course": self.course}
 
@@ -168,17 +187,20 @@ class RAGWithUsage(RAGBase):
             input=input_messages
         )
 
+        # Capture usage before returning so we can price the run later
         self.last_usage = response.usage
         self.usages.append(response.usage)
 
         return response.output_text
 
     def total_cost(self):
-        """Return total cost in USD for all tracked usage."""
+        """Return total cost in USD for all tracked usage objects."""
         return calc_total_price(self.usages)
 
 
 # ── Parallel processing ──────────────────────────────────────────────────
+# ThreadPoolExecutor + tqdm: submits all jobs at once, then updates the
+# progress bar as each one finishes.  Keeps results in input order.
 
 
 def map_progress(pool, seq, f):
@@ -186,7 +208,9 @@ def map_progress(pool, seq, f):
     Apply function *f* to every element in *seq* using an existing
     ThreadPoolExecutor, and show a tqdm progress bar while waiting.
 
-    Results are returned in the same order as *seq*.
+    Submits all tasks immediately, then collects results in order as they
+    complete.  This is more efficient than iterating sequentially when each
+    call is I/O-bound (e.g., waiting on an HTTP response).
 
     Args:
         pool: A concurrent.futures.ThreadPoolExecutor instance.
@@ -194,7 +218,7 @@ def map_progress(pool, seq, f):
         f: Callable taking a single item.
 
     Returns:
-        List of results in input order.
+        List of results in the same order as *seq*.
     """
     results = []
 
@@ -203,9 +227,11 @@ def map_progress(pool, seq, f):
 
         for el in seq:
             future = pool.submit(f, el)
+            # Callback fires when the future completes, updating the bar
             future.add_done_callback(lambda p: progress.update())
             futures.append(future)
 
+        # Collect in submission order so results match seq order
         for future in futures:
             result = future.result()
             results.append(result)

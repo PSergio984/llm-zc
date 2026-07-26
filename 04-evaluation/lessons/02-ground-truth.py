@@ -24,15 +24,18 @@ from ingest import load_faq_data
 from evaluation_utils import llm_structured, calc_price
 
 # ── 1. Load the FAQ documents ────────────────────────────────────────────
-# We need a set of documents where we know the correct answer for each query.
-# The FAQ data has built-in IDs — each record becomes a ground-truth label.
+# Ground truth requires a set of queries where we know which document is
+# the correct answer.  The FAQ data already has a stable 'id' per record,
+# so that ID becomes our ground-truth label — when we run search later,
+# we check whether the results contain this document.
 
 load_dotenv()
 openai_client = OpenAI()
 
 documents = load_faq_data()
 
-# Keep only the LLM Zoomcamp FAQ (118 docs) to limit cost and time
+# Keep only the LLM Zoomcamp FAQ (118 docs) to limit cost and time.
+# The full dataset has 1380 documents across multiple courses.
 documents = [doc for doc in documents if doc["course"] == "llm-zoomcamp"]
 
 print(f"Number of LLM Zoomcamp documents: {len(documents)}")
@@ -46,11 +49,14 @@ print(f"Answer: {doc['answer'][:200]}...")
 # ── 2. Define the structured output model ────────────────────────────────
 # Using Pydantic ensures the LLM returns a consistent structure we can
 # process programmatically — no regex parsing of free-form text.
+# The model class tells the API we expect a JSON object with a "questions" key.
 
 class Questions(BaseModel):
     """Schema for the LLM's structured output: a list of generated questions."""
     questions: list[str]
 
+# The prompt instructs the LLM to act like a student, rephrase in natural
+# language (avoiding verbatim FAQ wording), and produce 5 questions.
 data_gen_instructions = """
 You emulate a student who's taking our course.
 Formulate 5 questions this student might ask based on a FAQ record. The record
@@ -63,7 +69,8 @@ on the internet. Not too formal, not too short, not too long.
 
 # ── 3. Generate questions for one document ───────────────────────────────
 # We pass the document as JSON so the LLM sees the full Q&A record.
-# The API returns a parsed Questions instance (not raw JSON).
+# The API returns a parsed Questions instance (not raw JSON), so we can
+# access result.questions directly.
 
 user_prompt = json.dumps(doc)
 
@@ -79,8 +86,9 @@ for q in result.questions:
     print(f"  • {q}")
 
 # ── 4. Track cost ───────────────────────────────────────────────────────
-# Each API call has a cost.  Tracking it helps budget before scaling up
-# to the full dataset (lesson 03).
+# Each API call costs money.  Tracking per-call cost lets us estimate
+# the budget needed before scaling up to the full 118-document batch
+# in lesson 03.
 
 cost = calc_price(usage)
 
@@ -90,7 +98,9 @@ print(f"Cost:          ${cost['total_cost']:.6f}")
 
 # ── 5. Build ground truth records ───────────────────────────────────────
 # Each record pairs a generated question with the document ID.
-# Later, evaluation checks whether search retrieves this document ID.
+# When we evaluate search later, we ask the search engine the question
+# and check whether it retrieves the document with this ID.
+# If every result is correct, that's perfect ground-truth coverage.
 
 records = [
     {"question": q, "document": doc["id"]}
