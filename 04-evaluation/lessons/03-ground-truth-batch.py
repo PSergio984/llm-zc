@@ -234,4 +234,12 @@ import os
 
 os.makedirs("data", exist_ok=True)
 df_ground_truth.to_csv("data/ground_truth-new.csv", index=False)
-print("Saved to data/ground_truth-new.csv")
+print(f"Saved {len(df_ground_truth)} records to data/ground_truth-new.csv")
+
+# ── 8. Verify ──────────────────────────────────────────────────────────────
+
+print(f"\nSummary:")
+print(f"  Documents processed: {len(documents)}")
+print(f"  Total ground truth records: {len(df_ground_truth)}")
+print(f"  Total cost: ${total_cost:.6f}")
+print(f"  Cost per record: ${total_cost / len(df_ground_truth):.6f}")
