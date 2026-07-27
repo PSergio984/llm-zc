@@ -156,36 +156,35 @@ def compute_relevance_total(ground_truth, search_function):
 # ── 6. Run on a sample first (smoke test) ────────────────────────────────
 # Before committing to the full dataset, verify the logic works on 15 queries.
 
-print("\n--- Sample: first 15 ground truth records ---")
+if __name__ == "__main__":
+    print("\n--- Sample: first 15 ground truth records ---")
 
-ground_truth_sample = ground_truth[:15]
-relevance_total_sample = compute_relevance_total(ground_truth_sample, text_search)
+    ground_truth_sample = ground_truth[:15]
+    relevance_total_sample = compute_relevance_total(ground_truth_sample, text_search)
 
-print("\nRelevance lists (sample):")
-for i, rel in enumerate(relevance_total_sample):
-    print(f"  [{i:2d}] {rel}")
+    print("\nRelevance lists (sample):")
+    for i, rel in enumerate(relevance_total_sample):
+        print(f"  [{i:2d}] {rel}")
 
-# Count how many queries had the correct doc at rank 1
-hit_rate_sample = sum(rel[0] == 1 for rel in relevance_total_sample) / len(relevance_total_sample)
-print(f"\nSample hit-rate (correct doc at rank 1): {hit_rate_sample:.0%}")
+    total_hits_sample = sum(rel[0] == 1 for rel in relevance_total_sample)
+    hit_rate_sample = total_hits_sample / len(relevance_total_sample)
+    print(f"\nSample hit-rate (correct doc at rank 1): {hit_rate_sample:.0%}")
 
-# ── 7. Run on all ground truth records ───────────────────────────────────
-# This produces the full relevance dataset consumed by lesson 05 metrics.
+    # ── 7. Run on all ground truth records ───────────────────────────────────
+    # This produces the full relevance dataset consumed by lesson 05 metrics.
 
-print(f"\n--- Full evaluation: all {len(ground_truth)} records ---")
+    print(f"\n--- Full evaluation: all {len(ground_truth)} records ---")
 
-relevance_total = compute_relevance_total(ground_truth, text_search)
+    relevance_total = compute_relevance_total(ground_truth, text_search)
 
-print(f"\nComputed {len(relevance_total)} relevance lists")
+    print(f"\nComputed {len(relevance_total)} relevance lists")
 
-# Quick aggregate stats
-total_hits = sum(rel[0] == 1 for rel in relevance_total)
-hit_rate = total_hits / len(relevance_total)
-print(f"Correct doc at rank 1: {total_hits}/{len(relevance_total)} ({hit_rate:.0%})")
+    total_hits = sum(rel[0] == 1 for rel in relevance_total)
+    hit_rate = total_hits / len(relevance_total)
+    print(f"Correct doc at rank 1: {total_hits}/{len(relevance_total)} ({hit_rate:.0%})")
 
-# Count how many queries found the correct doc anywhere in top-5
-found_anywhere = sum(any(r == 1 for r in rel) for rel in relevance_total)
-recall_at_5 = found_anywhere / len(relevance_total)
-print(f"Correct doc in top-5: {found_anywhere}/{len(relevance_total)} ({recall_at_5:.0%})")
+    found_anywhere = sum(any(r == 1 for r in rel) for rel in relevance_total)
+    recall_at_5 = found_anywhere / len(relevance_total)
+    print(f"Correct doc in top-5: {found_anywhere}/{len(relevance_total)} ({recall_at_5:.0%})")
 
-print("\nRelevance data ready for metric computation (lesson 05).")
+    print("\nRelevance data ready for metric computation (lesson 05).")
