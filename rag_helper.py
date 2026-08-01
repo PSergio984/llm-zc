@@ -53,7 +53,7 @@ class RAGBase:
         instructions=INSTRUCTIONS,
         prompt_template=PROMPT_TEMPLATE,
         course="llm-zoomcamp",
-        model="gpt-5.4-mini"
+        model="llama-3.3-70b-versatile"
     ):
         """
         Store the search index, the LLM client, and the behavioural

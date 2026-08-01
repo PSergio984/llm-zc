@@ -20,7 +20,7 @@ from rag_helper import RAGBase
 
 # ── Pricing helpers ──────────────────────────────────────────────────────
 # OpenAI charges per token, split into input (prompt) and output (completion).
-# The rates below are for gpt-5.4-mini / gpt-4o-mini used in this course.
+# The rates below are for llama-3.3-70b-versatile on Groq, used in this course.
 # We return a dict so callers can inspect the breakdown if needed.
 
 
@@ -34,8 +34,8 @@ def calc_price(usage):
     Returns:
         dict with keys 'input_cost', 'output_cost', 'total_cost'.
     """
-    input_price_per_million = 0.75
-    output_price_per_million = 4.50
+    input_price_per_million = 0.59
+    output_price_per_million = 0.79
 
     # Convert per-token rates to actual cost based on usage
     input_cost = (usage.input_tokens / 1_000_000) * input_price_per_million
@@ -74,7 +74,7 @@ def calc_total_price(usages):
 # and receive a fully parsed instance — no JSON parsing required.
 
 
-def llm_structured(client, instructions, user_prompt, output_type, model="gpt-5.4-mini"):
+def llm_structured(client, instructions, user_prompt, output_type, model="llama-3.3-70b-versatile"):
     """
     Call the OpenAI Responses API with structured output.
 
@@ -111,7 +111,7 @@ def llm_structured_retry(
     instructions,
     user_prompt,
     output_type,
-    model="gpt-5.4-mini",
+    model="llama-3.3-70b-versatile",
     max_retries=3,
 ):
     """
