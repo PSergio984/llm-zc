@@ -8,6 +8,8 @@ LLMCallRecord dataclass used for live calls.
 
   - row_to_record(row)     → map a DB row tuple onto LLMCallRecord fields
   - get_conversations(limit) → most recent conversations, newest first
+  - Stats / get_stats()    → aggregate numbers (lesson 07): total count,
+                             average response time, total cost, avg tokens
 
 Ordering: by timestamp DESC. There is no index on timestamp (only on
 id); ids increase over time anyway, so ordering by id would be faster
@@ -24,6 +26,16 @@ from dataclasses import dataclass
 
 from db_init import get_db_connection
 from metrics import LLMCallRecord
+
+
+@dataclass
+class Stats:
+    """Aggregate numbers over all saved conversations (lesson 07)."""
+
+    total: int
+    avg_response_time: float
+    total_cost: float
+    avg_tokens: float
 
 
 def row_to_record(row):
@@ -68,6 +80,31 @@ def get_conversations(limit=10):
 
     # Convert raw tuples into the familiar dataclass shape
     return [row_to_record(row) for row in rows]
+
+
+def get_stats():
+    """Return one row of aggregates (count, latency, cost, tokens)."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    COUNT(*),
+                    AVG(response_time),
+                    SUM(cost),
+                    AVG(total_tokens)
+                FROM conversations
+            """)
+            row = cur.fetchone()
+    finally:
+        conn.close()
+
+    return Stats(
+        total=row[0],
+        avg_response_time=row[1],
+        total_cost=row[2],
+        avg_tokens=row[3],
+    )
 
 
 if __name__ == "__main__":
