@@ -18,6 +18,7 @@ Usage:
 
 import streamlit as st
 from assistant import create_assistant
+from db_save import save_conversation
 
 # Build the instrumented RAG assistant once, when the app starts
 assistant = create_assistant()
@@ -39,3 +40,8 @@ if st.button("Ask"):
         st.write(f"Prompt tokens: {record.prompt_tokens}")
         st.write(f"Completion tokens: {record.completion_tokens}")
         st.write(f"Cost: ${record.cost:.4f}")
+
+        # Persist this call to the monitoring Postgres (lesson 05);
+        # keep the id so feedback can be attached to the conversation
+        conversation_id = save_conversation(record, user_input, "llm-zoomcamp")
+        st.session_state.conversation_id = conversation_id
