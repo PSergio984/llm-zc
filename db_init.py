@@ -14,6 +14,8 @@ This module provides:
                         `postgres` service (course-assistant-pg)
   - init_db(drop)     → create the `conversations` table (one row per
                         LLM call: tokens, response time, cost, ...)
+  - init_feedback(drop) → create the `feedback` table (lesson 08):
+                        user/judge ratings attached to conversations
 
 The table is created once; data survives container restarts because the
 compose service uses a named volume. Re-run init_db only when changing
@@ -78,6 +80,32 @@ def init_db(drop=False):
         conn.close()
 
 
+def init_feedback(drop=False):
+    """Create the feedback table; with drop=True, drop it first."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            if drop:
+                # Wipes all existing feedback — only for schema changes
+                cur.execute("DROP TABLE IF EXISTS feedback")
+
+            cur.execute("""
+                CREATE TABLE feedback (
+                    id SERIAL PRIMARY KEY,
+                    conversation_id INTEGER REFERENCES conversations(id),
+                    source TEXT NOT NULL,
+                    relevance TEXT,
+                    explanation TEXT,
+                    score INTEGER,
+                    timestamp TIMESTAMP WITH TIME ZONE NOT NULL
+                )
+            """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     init_db()
+    init_feedback()
     print("Database initialized")
