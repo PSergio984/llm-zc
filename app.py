@@ -8,13 +8,16 @@ answer. Because the assistant is a RAGWithMetrics (see metrics.py), we
 also render the last call's response time, token usage and cost below
 the answer — the visibility that the monitoring module is about. Lesson 08
 adds +1/-1 feedback buttons: ratings are saved to the feedback table
-alongside the conversation they refer to.
+alongside the conversation they refer to. Lesson 09 adds an automatic
+LLM judge that grades each answer's relevance and saves it to the same
+table with source="judge".
 
-Follows the llm-zoomcamp lessons "Chat App", "Capturing Metrics", and
-"User Feedback":
+Follows the llm-zoomcamp lessons "Chat App", "Capturing Metrics",
+"User Feedback", and "Built-in Judge":
   https://github.com/DataTalksClub/llm-zoomcamp/blob/main/05-monitoring/lessons/03-chat-app.md
   https://github.com/DataTalksClub/llm-zoomcamp/blob/main/05-monitoring/lessons/04-metrics.md
   https://github.com/DataTalksClub/llm-zoomcamp/blob/main/05-monitoring/lessons/08-user-feedback.md
+  https://github.com/DataTalksClub/llm-zoomcamp/blob/main/05-monitoring/lessons/09-built-in-judge.md
 
 Usage:
   uv run streamlit run app.py
@@ -24,6 +27,7 @@ import streamlit as st
 from assistant import create_assistant
 from db_save import save_conversation
 from db_feedback import save_feedback
+from judge import evaluate_relevance
 
 # Build the instrumented RAG assistant once, when the app starts
 assistant = create_assistant()
@@ -50,6 +54,15 @@ if st.button("Ask"):
         # keep the id so feedback can be attached to the conversation
         conversation_id = save_conversation(record, user_input, "llm-zoomcamp")
         st.session_state.conversation_id = conversation_id
+
+        # Automatic quality signal: an LLM judge grades relevance
+        # (lesson 09). Lands in the same feedback table as user ratings,
+        # tagged source="judge".
+        relevance, explanation = evaluate_relevance(user_input, answer)
+        save_feedback(conversation_id, "judge",
+                      relevance=relevance, explanation=explanation)
+        st.write(f"Relevance: {relevance}")
+        st.write(f"Explanation: {explanation}")
 
 # Feedback buttons live at top level, NOT inside the Ask block.
 # Streamlit reruns the whole script on every click; when either feedback

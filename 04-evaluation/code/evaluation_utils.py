@@ -11,8 +11,10 @@ Provides functions for:
 Intended for use in the lesson workflows under 04-evaluation/lessons/.
 """
 
+import json
 import time
 
+from openai import BadRequestError
 from tqdm.auto import tqdm
 
 from rag_helper import RAGBase
@@ -81,6 +83,11 @@ def llm_structured(client, instructions, user_prompt, output_type, model="llama-
     Uses client.responses.parse() with text_format=output_type so the
     return value is a parsed Pydantic model instead of raw text.
 
+    Providers that reject json_schema structured output (e.g. Groq for
+    llama models) automatically fall back to JSON mode: the prompt is
+    augmented with the model's JSON schema, and the returned text is
+    parsed with output_type.model_validate_json().
+
     Args:
         client: OpenAI client instance.
         instructions: Developer/system instruction for the LLM.
@@ -97,15 +104,38 @@ def llm_structured(client, instructions, user_prompt, output_type, model="llama-
         {"role": "user", "content": user_prompt}
     ]
 
-    response = client.responses.parse(
-        model=model,
-        input=messages,
-        text_format=output_type
-    )
+    try:
+        response = client.responses.parse(
+            model=model,
+            input=messages,
+            text_format=output_type
+        )
+    except BadRequestError as e:
+        # Providers like Groq reject json_schema structured output for some
+        # models. Fall back to JSON mode: ask for a JSON object in plain
+        # text and parse it with the pydantic model. Only fall back when
+        # the error is specifically about the unsupported json_schema
+        # format; other errors propagate to the caller's retry logic.
+        if "json_schema" not in str(e.message):
+            raise
+
+        json_prompt = user_prompt + (
+            "\n\nReturn your response as a single JSON object "
+            "matching this schema:\n"
+            + json.dumps(output_type.model_json_schema())
+        )
+        messages = [
+            {"role": "developer", "content": instructions},
+            {"role": "user", "content": json_prompt},
+        ]
+        response = client.responses.create(
+            model=model,
+            input=messages,
+            text={"format": {"type": "json_object"}},
+        )
+        return output_type.model_validate_json(response.output_text), response.usage
 
     return response.output_parsed, response.usage
-
-
 def llm_structured_retry(
     client,
     instructions,
