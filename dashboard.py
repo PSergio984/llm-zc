@@ -14,8 +14,15 @@ Layout, top to bottom:
      response time over time. We fetch whole LLMCallRecords and chart
      two columns — not the leanest approach (a dedicated query would
      fetch only timestamp + value), but fine at this volume.
-  3. The 20 most recent conversations rendered as plain text snippets
+  3. Quality panels (lesson 10): judge relevance distribution bar chart
+     and thumbs up / thumbs down counts, straight from the feedback
+     table.
+  4. The 20 most recent conversations rendered as plain text snippets
      with their response time and cost.
+
+The feedback panels are empty until the feedback table exists and has
+rows; the query functions return empty results when the table has not
+been initialized yet.
 
 Follows the llm-zoomcamp lesson "Streamlit Dashboard":
   https://github.com/DataTalksClub/llm-zoomcamp/blob/main/05-monitoring/lessons/07-streamlit-dashboard.md
@@ -27,7 +34,7 @@ Usage (port 8501 is the chat app, so use 8502):
 import streamlit as st
 from dataclasses import asdict
 import pandas as pd
-from db_query import get_conversations, get_stats
+from db_query import get_conversations, get_stats, get_relevance_stats, get_user_feedback_stats
 
 st.title("Course Assistant Dashboard")
 
@@ -49,6 +56,16 @@ st.line_chart(df, x="timestamp", y="cost")
 
 st.subheader("Response time over time")
 st.line_chart(df, x="timestamp", y="response_time")
+
+st.subheader("Judge relevance")
+relevance = get_relevance_stats()
+st.bar_chart(relevance)
+
+st.subheader("User feedback")
+thumbs_up, thumbs_down = get_user_feedback_stats()
+col1, col2 = st.columns(2)
+col1.metric("Thumbs up", int(thumbs_up or 0))
+col2.metric("Thumbs down", int(thumbs_down or 0))
 
 st.subheader("Recent conversations")
 records = get_conversations(limit=20)

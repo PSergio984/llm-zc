@@ -10,6 +10,14 @@ LLMCallRecord dataclass used for live calls.
   - get_conversations(limit) → most recent conversations, newest first
   - Stats / get_stats()    → aggregate numbers (lesson 07): total count,
                              average response time, total cost, avg tokens
+  - get_relevance_stats()  → judge relevance distribution (lesson 10):
+                             {label: count} over source='judge' feedback
+  - get_user_feedback_stats() → thumbs up / thumbs down counts over
+                             source='user' feedback (lesson 10)
+
+The feedback queries return empty results when the feedback table does
+not exist yet (db_init.py not run), so the dashboard renders empty
+panels instead of crashing.
 
 Ordering: by timestamp DESC. There is no index on timestamp (only on
 id); ids increase over time anyway, so ordering by id would be faster
@@ -23,6 +31,8 @@ Usage:
 """
 
 from dataclasses import dataclass
+
+from psycopg import errors
 
 from db_init import get_db_connection
 from metrics import LLMCallRecord
@@ -105,6 +115,47 @@ def get_stats():
         total_cost=row[2],
         avg_tokens=row[3],
     )
+
+
+def get_relevance_stats():
+    """Judge relevance distribution: {label: count} for source='judge'."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT relevance, COUNT(*)
+                FROM feedback
+                WHERE source = 'judge'
+                GROUP BY relevance
+            """)
+            rows = cur.fetchall()
+    except errors.UndefinedTable:
+        # Feedback table not initialized yet — treat as empty
+        return {}
+    finally:
+        conn.close()
+    return dict(rows)
+
+
+def get_user_feedback_stats():
+    """(thumbs_up, thumbs_down) counts for source='user' feedback."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    SUM(CASE WHEN score > 0 THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN score < 0 THEN 1 ELSE 0 END)
+                FROM feedback
+                WHERE source = 'user'
+            """)
+            row = cur.fetchone()
+    except errors.UndefinedTable:
+        # Feedback table not initialized yet — treat as empty
+        return (None, None)
+    finally:
+        conn.close()
+    return row
 
 
 if __name__ == "__main__":
