@@ -1,0 +1,21 @@
+apiVersion: 1
+
+# PostgreSQL data source for the monitoring database (lesson 12).
+# Grafana reaches the container by name over the compose network.
+datasources:
+  - name: PostgreSQL
+    type: postgresql
+    # Fixed uid, referenced by every panel in the dashboard JSON
+    uid: postgres-monitoring
+    access: proxy
+    url: course-assistant-pg:5432
+    database: course_assistant
+    user: user
+    secureJsonData:
+      # Password stored in Grafana's secret store, never in dashboards
+      password: password
+    jsonData:
+      sslmode: disable
+      # postgresVersion uses Grafana's encoding: 1700 = PostgreSQL 17
+      postgresVersion: 1700
+      timescaledb: false

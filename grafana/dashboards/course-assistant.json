@@ -1,0 +1,173 @@
+{
+  "title": "Course Assistant Monitoring",
+  "uid": "course-assistant-monitoring",
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Recent conversations",
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT\n  timestamp AS time,\n  question,\n  answer,\n  response_time,\n  cost\nFROM conversations\nWHERE timestamp BETWEEN $__timeFrom() AND $__timeTo()\nORDER BY timestamp DESC\nLIMIT 5"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto" } },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "barchart",
+      "title": "Model usage",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 5 },
+      "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT\n  model,\n  COUNT(*) as count\nFROM conversations\nWHERE timestamp BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY model"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "fillOpacity": 80 } },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "piechart",
+      "title": "Relevance distribution",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 5 },
+      "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT\n  relevance,\n  COUNT(*) as count\nFROM feedback\nWHERE source = 'judge'\n  AND timestamp BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY relevance"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "gauge",
+      "title": "User feedback",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 5 },
+      "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT\n  SUM(CASE WHEN score > 0 THEN 1 ELSE 0 END) as thumbs_up,\n  SUM(CASE WHEN score < 0 THEN 1 ELSE 0 END) as thumbs_down\nFROM feedback\nWHERE source = 'user'\n  AND timestamp BETWEEN $__timeFrom() AND $__timeTo()"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Response time",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 13 },
+      "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT\n  timestamp AS time,\n  response_time\nFROM conversations\nWHERE timestamp BETWEEN $__timeFrom() AND $__timeTo()\nORDER BY timestamp"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Token usage",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 13 },
+      "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT\n  $__timeGroup(timestamp, $__interval) AS time,\n  AVG(total_tokens) AS avg_tokens\nFROM conversations\nWHERE timestamp BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Cost",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 13 },
+      "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgresql", "uid": "postgres-monitoring" },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT\n  $__timeGroup(timestamp, $__interval) AS time,\n  SUM(cost) AS total_cost\nFROM conversations\nWHERE timestamp BETWEEN $__timeFrom() AND $__timeTo()\n  AND cost > 0\nGROUP BY 1\nORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

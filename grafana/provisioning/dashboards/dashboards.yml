@@ -1,0 +1,16 @@
+apiVersion: 1
+
+# Dashboard provider (lesson 12): load every dashboard JSON found in
+# /var/lib/grafana/dashboards (mapped to ./grafana/dashboards in
+# docker-compose.yml) into Grafana on startup.
+providers:
+  - name: default
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    # Re-check the folder every 30s, so file edits appear without restart
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
